@@ -58,6 +58,8 @@ This project includes Vercel Serverless API routes:
 
 - `GET /api/sheets/import`
 - `POST /api/sheets/export`
+- `GET /api/sheets/meta`
+- `GET /api/sheets/health`
 
 Set these environment variables in Vercel (Project Settings → Environment Variables):
 
@@ -84,6 +86,14 @@ The app supports automatic sync when Auto Sync is enabled:
 - Background: checks a `Meta` sheet timestamp and imports if it changed
 
 This is designed for convenience (last-write-wins). If you edit from two devices at the same time, the most recent export will overwrite previous changes.
+
+### Troubleshooting Sync (Stale Data)
+
+- Open Settings → Google Sheets Sync and check the Sync Status (last import/export, errors, failures).
+- Confirm the sheet is shared with your service account email (`GOOGLE_CLIENT_EMAIL`) with Editor access.
+- Check the server health endpoint (requires the sync token header):
+  - `GET /api/sheets/health` with header `x-sync-token: <your token>`
+  - Look at `meta.updatedAt` to confirm the sheet is being updated.
 
 ## Security Note
 

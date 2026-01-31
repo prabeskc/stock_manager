@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ROD_SIZES, type RodSize } from '../../domain/inventory'
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
 import { useInventoryStore } from '../../store/inventoryStore'
+import { bumpRetryRequest, readSyncStatus, updateSyncStatus } from '../sync/syncStorage'
 
 export function SettingsPage() {
   const items = useInventoryStore((s) => s.items)
@@ -31,6 +32,12 @@ export function SettingsPage() {
       return true
     }
   })
+  const [status, setStatus] = useState(() => readSyncStatus())
+
+  useEffect(() => {
+    const id = window.setInterval(() => setStatus(readSyncStatus()), 1000)
+    return () => window.clearInterval(id)
+  }, [])
 
   const ensureJsonResponse = (res: Response) => {
     const contentType = res.headers.get('content-type') ?? ''
@@ -168,6 +175,49 @@ export function SettingsPage() {
             </label>
           </div>
 
+          <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-base font-medium text-slate-700">Sync Status</div>
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => {
+                  bumpRetryRequest()
+                  setSyncMessage('Retry requested. Sync will run now.')
+                }}
+              >
+                Retry Now
+              </Button>
+            </div>
+
+            <div className="mt-3 grid gap-2 text-sm text-slate-700">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-slate-500">Last import</div>
+                <div>{status.lastImportAt ? new Date(status.lastImportAt).toLocaleString() : '—'}</div>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-slate-500">Last export</div>
+                <div>{status.lastExportAt ? new Date(status.lastExportAt).toLocaleString() : '—'}</div>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-slate-500">Sheet updatedAt</div>
+                <div>
+                  {status.lastRemoteUpdatedAt ? new Date(status.lastRemoteUpdatedAt).toLocaleString() : '—'}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-slate-500">Failures</div>
+                <div>{String(status.consecutiveFailures ?? 0)}</div>
+              </div>
+            </div>
+
+            {status.lastError ? (
+              <div className="mt-3 rounded-md bg-rose-50 p-3 text-sm text-rose-700 ring-1 ring-rose-100">
+                {status.lastError}
+              </div>
+            ) : null}
+          </div>
+
           <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="secondary"
@@ -186,8 +236,19 @@ export function SettingsPage() {
                   throw new Error(json?.error ?? 'Import failed.')
                 }
                 setAll(json.data)
+                updateSyncStatus({
+                  lastImportAt: new Date().toISOString(),
+                  lastError: null,
+                  lastErrorAt: null,
+                  consecutiveFailures: 0,
+                  lastRemoteUpdatedAt: json?.meta?.updatedAt ?? null,
+                })
                 setSyncMessage('Imported data from Google Sheets.')
               } catch (e) {
+                updateSyncStatus({
+                  lastError: e instanceof Error ? e.message : 'Import failed.',
+                  lastErrorAt: new Date().toISOString(),
+                })
                 setSyncMessage(e instanceof Error ? e.message : 'Import failed.')
               } finally {
                 setSyncing(false)
@@ -215,8 +276,19 @@ export function SettingsPage() {
                 if (!res.ok) {
                   throw new Error(json?.error ?? 'Export failed.')
                 }
+                updateSyncStatus({
+                  lastExportAt: new Date().toISOString(),
+                  lastError: null,
+                  lastErrorAt: null,
+                  consecutiveFailures: 0,
+                  lastRemoteUpdatedAt: json?.meta?.updatedAt ?? null,
+                })
                 setSyncMessage('Exported data to Google Sheets.')
               } catch (e) {
+                updateSyncStatus({
+                  lastError: e instanceof Error ? e.message : 'Export failed.',
+                  lastErrorAt: new Date().toISOString(),
+                })
                 setSyncMessage(e instanceof Error ? e.message : 'Export failed.')
               } finally {
                 setSyncing(false)

@@ -24,6 +24,7 @@ function getUpdatedAt(values: (string | number)[][]): string | null {
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   try {
+    res.setHeader?.('cache-control', 'no-store')
     if (req.method !== 'GET') {
       res.status(405).json({ error: 'Method not allowed' })
       return

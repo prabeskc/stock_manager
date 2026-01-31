@@ -1,24 +1,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useInventoryStore } from '../../store/inventoryStore'
 import type { InventoryItem, InventoryTransaction, RodSize } from '../../domain/inventory'
+import { computeBackoffMs } from './backoff'
+import {
+  AUTO_SYNC_KEY,
+  PENDING_EXPORT_KEY,
+  RETRY_REQUESTED_AT_KEY,
+  SYNC_TOKEN_KEY,
+  updateSyncStatus,
+  readLocalStorage,
+  removeLocalStorage,
+  writeLocalStorage,
+} from './syncStorage'
 
 type SyncState = {
   enabled: boolean
   token: string
 }
 
-const SYNC_TOKEN_KEY = 'hardware-stock-manager:syncToken'
-const AUTO_SYNC_KEY = 'hardware-stock-manager:autoSyncEnabled'
 const META_POLL_MS = 30000
 const EXPORT_DEBOUNCE_MS = 1500
-
-function readLocalStorage(key: string): string | null {
-  try {
-    return localStorage.getItem(key)
-  } catch {
-    return null
-  }
-}
+const BASE_BACKOFF_MS = 1000
+const MAX_BACKOFF_MS = 30000
 
 function readSyncState(): SyncState {
   const token = readLocalStorage(SYNC_TOKEN_KEY) ?? ''
@@ -85,6 +88,35 @@ function getResponseData(value: unknown): unknown | null {
   return 'data' in value ? value.data : null
 }
 
+function getRetryAfterSeconds(res: Response): number | null {
+  const value = res.headers.get('retry-after')
+  if (!value) return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+async function readJsonSafely(res: Response): Promise<unknown | null> {
+  const contentType = res.headers.get('content-type') ?? ''
+  if (!contentType.includes('application/json')) return null
+  return (await res.json().catch(() => null)) as unknown
+}
+
+function formatFetchError({
+  url,
+  status,
+  json,
+}: {
+  url: string
+  status: number
+  json: unknown | null
+}): string {
+  if (isRecord(json) && typeof json.error === 'string') return json.error
+  if (status === 401) return 'Unauthorized (check sync token).'
+  if (status === 429) return 'Rate limited by Google/Vercel. Retrying…'
+  if (status >= 500) return 'Server error. Retrying…'
+  return `Request failed (${status}) for ${url}`
+}
+
 export function useAutoSheetsSync() {
   const items = useInventoryStore((s) => s.items)
   const transactions = useInventoryStore((s) => s.transactions)
@@ -106,6 +138,9 @@ export function useAutoSheetsSync() {
   const exportInFlightRef = useRef(false)
   const exportTimerRef = useRef<number | null>(null)
   const hasImportedOnceRef = useRef(false)
+  const retryTimerRef = useRef<number | null>(null)
+  const lastRetryRequestRef = useRef<string | null>(null)
+  const failureCountRef = useRef(0)
 
   const authHeaders = useMemo(() => {
     if (!syncState.token) return null
@@ -117,9 +152,18 @@ export function useAutoSheetsSync() {
     if (importInFlightRef.current) return
     importInFlightRef.current = true
     try {
-      const res = await fetch('/api/sheets/import', { headers: authHeaders })
-      const json = (await res.json().catch(() => null)) as unknown
-      if (!res.ok) return
+      const url = '/api/sheets/import'
+      const res = await fetch(url, { headers: authHeaders, cache: 'no-store' })
+      const json = await readJsonSafely(res)
+      if (!res.ok) {
+        failureCountRef.current += 1
+        updateSyncStatus({
+          lastError: formatFetchError({ url, status: res.status, json }),
+          lastErrorAt: new Date().toISOString(),
+          consecutiveFailures: failureCountRef.current,
+        })
+        return
+      }
       if (!isRecord(json) || json.ok !== true) return
 
       const updatedAt = getMetaUpdatedAt(json)
@@ -133,6 +177,14 @@ export function useAutoSheetsSync() {
       }
       hasImportedOnceRef.current = true
       lastRemoteUpdatedAtRef.current = updatedAt
+      updateSyncStatus({
+        lastImportAt: new Date().toISOString(),
+        lastError: null,
+        lastErrorAt: null,
+        consecutiveFailures: 0,
+        lastRemoteUpdatedAt: updatedAt,
+      })
+      failureCountRef.current = 0
     } finally {
       importInFlightRef.current = false
     }
@@ -143,17 +195,48 @@ export function useAutoSheetsSync() {
     if (exportInFlightRef.current) return
     exportInFlightRef.current = true
     try {
-      const res = await fetch('/api/sheets/export', {
+      const url = '/api/sheets/export'
+      const res = await fetch(url, {
         method: 'POST',
         headers: { ...authHeaders, 'content-type': 'application/json' },
         body: payload,
+        cache: 'no-store',
       })
-      const json = (await res.json().catch(() => null)) as unknown
-      if (!res.ok) return
+      const json = await readJsonSafely(res)
+      if (!res.ok) {
+        writeLocalStorage(PENDING_EXPORT_KEY, payload)
+        failureCountRef.current += 1
+        updateSyncStatus({
+          lastError: formatFetchError({ url, status: res.status, json }),
+          lastErrorAt: new Date().toISOString(),
+          consecutiveFailures: failureCountRef.current,
+        })
+        const retryAfterSeconds = res.status === 429 ? getRetryAfterSeconds(res) : null
+        const delayMs = computeBackoffMs({
+          attempt: failureCountRef.current,
+          baseMs: BASE_BACKOFF_MS,
+          maxMs: MAX_BACKOFF_MS,
+          retryAfterSeconds,
+        })
+        if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current)
+        retryTimerRef.current = window.setTimeout(() => {
+          void exportToSheet()
+        }, delayMs)
+        return
+      }
       if (!isRecord(json) || json.ok !== true) return
       const updatedAt = getMetaUpdatedAt(json)
       lastRemoteUpdatedAtRef.current = updatedAt
       lastExportedPayloadRef.current = payload
+      removeLocalStorage(PENDING_EXPORT_KEY)
+      updateSyncStatus({
+        lastExportAt: new Date().toISOString(),
+        lastError: null,
+        lastErrorAt: null,
+        consecutiveFailures: 0,
+        lastRemoteUpdatedAt: updatedAt,
+      })
+      failureCountRef.current = 0
     } finally {
       exportInFlightRef.current = false
     }
@@ -186,11 +269,28 @@ export function useAutoSheetsSync() {
     if (!syncState.enabled) return
     if (!authHeaders) return
 
+    const pending = readLocalStorage(PENDING_EXPORT_KEY)
+    if (pending && pending !== lastExportedPayloadRef.current && !exportInFlightRef.current) {
+      void exportToSheet()
+    }
+  }, [authHeaders, exportToSheet, syncState.enabled])
+
+  useEffect(() => {
+    if (!syncState.enabled) return
+    if (!authHeaders) return
+
     const tick = async () => {
       if (importInFlightRef.current || exportInFlightRef.current) return
-      const res = await fetch('/api/sheets/meta', { headers: authHeaders })
-      const json = (await res.json().catch(() => null)) as unknown
-      if (!res.ok) return
+      const url = '/api/sheets/meta'
+      const res = await fetch(url, { headers: authHeaders, cache: 'no-store' })
+      const json = await readJsonSafely(res)
+      if (!res.ok) {
+        updateSyncStatus({
+          lastError: formatFetchError({ url, status: res.status, json }),
+          lastErrorAt: new Date().toISOString(),
+        })
+        return
+      }
       if (!isRecord(json) || json.ok !== true) return
 
       const meta = json.meta
@@ -199,10 +299,37 @@ export function useAutoSheetsSync() {
       if (!remoteUpdatedAt || remoteUpdatedAt === localKnown) return
 
       lastRemoteUpdatedAtRef.current = remoteUpdatedAt
+      updateSyncStatus({ lastRemoteUpdatedAt: remoteUpdatedAt })
       void importFromSheet()
     }
 
     const id = window.setInterval(() => void tick(), META_POLL_MS)
     return () => window.clearInterval(id)
   }, [authHeaders, importFromSheet, syncState.enabled])
+
+  useEffect(() => {
+    if (!syncState.enabled) return
+    if (!authHeaders) return
+
+    const onOnline = () => {
+      void importFromSheet()
+      void exportToSheet()
+    }
+
+    window.addEventListener('online', onOnline)
+    return () => window.removeEventListener('online', onOnline)
+  }, [authHeaders, exportToSheet, importFromSheet, syncState.enabled])
+
+  useEffect(() => {
+    if (!syncState.enabled) return
+    if (!authHeaders) return
+    const id = window.setInterval(() => {
+      const current = readLocalStorage(RETRY_REQUESTED_AT_KEY)
+      if (!current || current === lastRetryRequestRef.current) return
+      lastRetryRequestRef.current = current
+      void importFromSheet()
+      void exportToSheet()
+    }, 1000)
+    return () => window.clearInterval(id)
+  }, [authHeaders, exportToSheet, importFromSheet, syncState.enabled])
 }

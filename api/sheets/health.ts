@@ -21,13 +21,23 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     assertValidSyncToken(req)
 
+    const config = {
+      hasSheetId: Boolean(process.env.GOOGLE_SHEET_ID),
+      hasClientEmail: Boolean(process.env.GOOGLE_CLIENT_EMAIL),
+      hasPrivateKey: Boolean(process.env.GOOGLE_PRIVATE_KEY),
+      hasSyncToken: Boolean(process.env.SHEETS_SYNC_TOKEN),
+    }
+
     const { sheets, spreadsheetId } = createSheetsClient()
     await ensureSheetsExist({ sheets, spreadsheetId, sheetTitles: ['Meta'] })
+    const metaValues = await readValues({ sheets, spreadsheetId, range: 'Meta!A2:B10' })
 
-    const values = await readValues({ sheets, spreadsheetId, range: 'Meta!A2:B10' })
-    const updatedAt = getUpdatedAt(values)
-
-    res.status(200).json({ ok: true, meta: { updatedAt } })
+    res.status(200).json({
+      ok: true,
+      serverTime: new Date().toISOString(),
+      config,
+      meta: { updatedAt: getUpdatedAt(metaValues) },
+    })
   } catch (e) {
     const statusCode = e instanceof HttpError ? e.statusCode : 500
     res.status(statusCode).json({
@@ -35,3 +45,4 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     })
   }
 }
+
