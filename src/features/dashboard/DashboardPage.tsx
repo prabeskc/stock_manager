@@ -69,33 +69,46 @@ export function DashboardPage() {
     return { totalQuantity, stockValue, lowStockCount, realizedProfit }
   }, [cementItems, cementTransactions])
 
+  const totalStockValue = metrics.stockValue + cementMetrics.stockValue
+  const totalRealizedProfit = metrics.realizedProfit + cementMetrics.realizedProfit
+
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
-          <div className="text-sm text-slate-500">Total Stock (pcs)</div>
-          <div className="mt-1 text-2xl font-semibold">{formatNumber(metrics.totalQuantity)}</div>
+          <div className="text-sm text-slate-500">Total Stock Value (CP)</div>
+          <div className="mt-1 text-2xl font-semibold">{formatMoney(totalStockValue)}</div>
         </Card>
         <Card>
-          <div className="text-sm text-slate-500">Stock Value (CP)</div>
-          <div className="mt-1 text-2xl font-semibold">{formatMoney(metrics.stockValue)}</div>
-        </Card>
-        <Card>
-          <div className="text-sm text-slate-500">Realized Profit</div>
-          <div className="mt-1 text-2xl font-semibold">{formatMoney(metrics.realizedProfit)}</div>
-        </Card>
-        <Card>
-          <div className="text-sm text-slate-500">Low Stock Sizes</div>
-          <div className="mt-1 text-2xl font-semibold">{formatNumber(metrics.lowStockCount)}</div>
+          <div className="text-sm text-slate-500">Realized Profit (Total)</div>
+          <div className="mt-1 text-2xl font-semibold">{formatMoney(totalRealizedProfit)}</div>
         </Card>
       </div>
 
       <div className="grid gap-4">
         <Card>
-          <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="text-base font-semibold">Inventory</div>
+              <div className="text-base font-semibold">Iron Rod Inventory</div>
               <div className="text-sm text-slate-500">Manage stock by rod size</div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+              <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
+                <div className="text-slate-500">Qty</div>
+                <div className="mt-1 text-lg font-semibold">{formatNumber(metrics.totalQuantity)}</div>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
+                <div className="text-slate-500">Value (CP)</div>
+                <div className="mt-1 text-lg font-semibold">{formatMoney(metrics.stockValue)}</div>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
+                <div className="text-slate-500">Profit</div>
+                <div className="mt-1 text-lg font-semibold">{formatMoney(metrics.realizedProfit)}</div>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
+                <div className="text-slate-500">Low stock</div>
+                <div className="mt-1 text-lg font-semibold">{formatNumber(metrics.lowStockCount)}</div>
+              </div>
             </div>
           </div>
 
@@ -197,7 +210,7 @@ export function DashboardPage() {
               <div className="text-base font-semibold">Cement Inventory</div>
               <div className="text-sm text-slate-500">Track cement bags and pricing</div>
             </div>
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
               <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
                 <div className="text-slate-500">Qty</div>
                 <div className="mt-1 text-lg font-semibold">{formatNumber(cementMetrics.totalQuantity)}</div>
@@ -205,6 +218,14 @@ export function DashboardPage() {
               <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
                 <div className="text-slate-500">Value (CP)</div>
                 <div className="mt-1 text-lg font-semibold">{formatMoney(cementMetrics.stockValue)}</div>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
+                <div className="text-slate-500">Profit</div>
+                <div className="mt-1 text-lg font-semibold">{formatMoney(cementMetrics.realizedProfit)}</div>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
+                <div className="text-slate-500">Low stock</div>
+                <div className="mt-1 text-lg font-semibold">{formatNumber(cementMetrics.lowStockCount)}</div>
               </div>
             </div>
           </div>
