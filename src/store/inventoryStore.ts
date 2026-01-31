@@ -27,6 +27,7 @@ export type InventoryStoreState = {
   transactions: InventoryTransaction[]
   addStock: (input: AddStockInput) => void
   deductStock: (input: DeductStockInput) => void
+  setAverageCostPrice: (size: RodSize, averageCostPrice: number) => void
   setSellingPrice: (size: RodSize, unitSellingPrice: number) => void
   setLowStockThreshold: (size: RodSize, lowStockThreshold: number) => void
   setAll: (data: { items: InventoryItems; transactions: InventoryTransaction[] }) => void
@@ -139,6 +140,15 @@ export const useInventoryStore = create<InventoryStoreState>()(
             transactions,
           }
         })
+      },
+      setAverageCostPrice: (size, averageCostPrice) => {
+        const value = roundMoney(averageCostPrice)
+        set((state) => ({
+          items: {
+            ...state.items,
+            [size]: { ...state.items[size], averageCostPrice: value },
+          },
+        }))
       },
       setSellingPrice: (size, unitSellingPrice) => {
         const value = roundMoney(unitSellingPrice)

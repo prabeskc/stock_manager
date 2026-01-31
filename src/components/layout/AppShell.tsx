@@ -18,17 +18,17 @@ const navItems: Array<{ view: AppView; label: string }> = [
 export function AppShell({ activeView, onChangeView, children }: AppShellProps) {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="mx-auto flex w-full max-w-7xl gap-6 p-4 md:p-6">
+      <div className="mx-auto flex w-full max-w-[1440px] gap-4 p-3 sm:p-4 md:gap-6 md:p-6">
         <aside className="hidden w-60 shrink-0 md:block">
           <div className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
-            <div className="text-sm font-semibold">Hardware Stock</div>
-            <div className="mt-1 text-xs text-slate-500">Iron Rod Manager</div>
+            <div className="text-base font-semibold">Hardware Stock</div>
+            <div className="mt-1 text-sm text-slate-500">Iron Rod Manager</div>
             <nav className="mt-4 flex flex-col gap-1">
               {navItems.map((item) => (
                 <button
                   key={item.view}
                   className={[
-                    'flex h-10 items-center rounded-md px-3 text-sm transition',
+                    'flex min-h-11 items-center rounded-md px-3 text-base transition',
                     item.view === activeView
                       ? 'bg-slate-900 text-white'
                       : 'text-slate-700 hover:bg-slate-100',
@@ -46,8 +46,8 @@ export function AppShell({ activeView, onChangeView, children }: AppShellProps) 
         <div className="min-w-0 flex-1">
           <header className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-white p-4 ring-1 ring-slate-200">
             <div className="min-w-0">
-              <div className="truncate text-sm font-semibold">Iron Rod Inventory Dashboard</div>
-              <div className="truncate text-xs text-slate-500">
+              <div className="truncate text-base font-semibold">Iron Rod Inventory Dashboard</div>
+              <div className="truncate text-sm text-slate-500">
                 Track 8mm, 10mm, 12mm stock, CP/SP, and profit
               </div>
             </div>
@@ -68,7 +68,7 @@ export function AppShell({ activeView, onChangeView, children }: AppShellProps) 
                 <button
                   key={item.view}
                   className={[
-                    'whitespace-nowrap rounded-md px-3 py-2 text-sm transition',
+                    'min-h-11 whitespace-nowrap rounded-md px-4 py-3 text-base transition',
                     item.view === activeView
                       ? 'bg-slate-900 text-white'
                       : 'text-slate-700 hover:bg-slate-100',

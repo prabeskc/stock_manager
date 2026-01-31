@@ -3,7 +3,7 @@ import type { ButtonHTMLAttributes } from 'react'
 type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost'
 
 const base =
-  'inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-50 disabled:pointer-events-none'
+  'inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 py-2 text-base font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:pointer-events-none disabled:opacity-50'
 
 const variants: Record<ButtonVariant, string> = {
   primary: 'bg-slate-900 text-white hover:bg-slate-800',

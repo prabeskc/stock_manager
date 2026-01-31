@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Suspense, lazy, useMemo, useState } from 'react'
 import { ROD_SIZES, type RodSize } from '../../domain/inventory'
 import { useInventoryStore } from '../../store/inventoryStore'
 import { formatMoney, formatNumber } from '../../utils/format'
@@ -6,7 +6,8 @@ import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
 import { Modal } from '../../components/ui/Modal'
-import { ChartsPanel } from './ChartsPanel'
+
+const ChartsPanel = lazy(() => import('./ChartsPanel').then((m) => ({ default: m.ChartsPanel })))
 
 type DialogState =
   | { type: 'none' }
@@ -16,6 +17,7 @@ type DialogState =
 export function DashboardPage() {
   const items = useInventoryStore((s) => s.items)
   const transactions = useInventoryStore((s) => s.transactions)
+  const setAverageCostPrice = useInventoryStore((s) => s.setAverageCostPrice)
   const setSellingPrice = useInventoryStore((s) => s.setSellingPrice)
   const addStock = useInventoryStore((s) => s.addStock)
   const deductStock = useInventoryStore((s) => s.deductStock)
@@ -44,43 +46,54 @@ export function DashboardPage() {
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
-          <div className="text-xs text-slate-500">Total Stock (pcs)</div>
+          <div className="text-sm text-slate-500">Total Stock (pcs)</div>
           <div className="mt-1 text-2xl font-semibold">{formatNumber(metrics.totalQuantity)}</div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500">Stock Value (CP)</div>
+          <div className="text-sm text-slate-500">Stock Value (CP)</div>
           <div className="mt-1 text-2xl font-semibold">{formatMoney(metrics.stockValue)}</div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500">Realized Profit</div>
+          <div className="text-sm text-slate-500">Realized Profit</div>
           <div className="mt-1 text-2xl font-semibold">{formatMoney(metrics.realizedProfit)}</div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500">Low Stock Sizes</div>
+          <div className="text-sm text-slate-500">Low Stock Sizes</div>
           <div className="mt-1 text-2xl font-semibold">{formatNumber(metrics.lowStockCount)}</div>
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+      <div className="grid gap-4">
+        <Card>
           <div className="mb-3 flex items-center justify-between gap-2">
             <div>
-              <div className="text-sm font-semibold">Inventory</div>
-              <div className="text-xs text-slate-500">Manage stock by rod size</div>
+              <div className="text-base font-semibold">Inventory</div>
+              <div className="text-sm text-slate-500">Manage stock by rod size</div>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="text-xs text-slate-500">
+          <div className="space-y-3 lg:hidden">
+            {ROD_SIZES.map((size) => (
+              <InventoryMobileCard
+                key={size}
+                size={size}
+                onAdd={() => setDialog({ type: 'add', size })}
+                onDeduct={() => setDialog({ type: 'deduct', size })}
+              />
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto lg:block">
+            <table className="w-full text-left text-base">
+              <thead className="text-sm text-slate-500">
                 <tr className="border-b border-slate-100">
-                  <th className="py-2 pr-4 font-medium">Size</th>
-                  <th className="py-2 pr-4 font-medium">Qty</th>
-                  <th className="py-2 pr-4 font-medium">CP (avg)</th>
-                  <th className="py-2 pr-4 font-medium">SP</th>
-                  <th className="py-2 pr-4 font-medium">Margin</th>
-                  <th className="py-2 pr-4 font-medium">Status</th>
-                  <th className="py-2 pr-4 font-medium">Actions</th>
+                  <th className="py-3 pr-4 font-medium">Size</th>
+                  <th className="py-3 pr-4 font-medium">Qty</th>
+                  <th className="py-3 pr-4 font-medium">CP (avg)</th>
+                  <th className="py-3 pr-4 font-medium">SP</th>
+                  <th className="py-3 pr-4 font-medium">Margin</th>
+                  <th className="py-3 pr-4 font-medium">Status</th>
+                  <th className="py-3 pr-4 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -91,36 +104,39 @@ export function DashboardPage() {
 
                   return (
                     <tr key={size} className="border-b border-slate-50">
-                      <td className="py-3 pr-4">
-                        <div className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
+                      <td className="py-4 pr-4">
+                        <div className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700">
                           {size}
                         </div>
                       </td>
-                      <td className="py-3 pr-4 font-medium">{formatNumber(item.quantity)}</td>
-                      <td className="py-3 pr-4">{formatMoney(item.averageCostPrice)}</td>
-                      <td className="py-3 pr-4">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={item.sellingPrice}
-                          onChange={(e) => setSellingPrice(size, Number(e.target.value))}
-                          className="h-9 max-w-[140px]"
+                      <td className="py-4 pr-4 font-medium">{formatNumber(item.quantity)}</td>
+                      <td className="py-4 pr-4">
+                        <InlineMoneyField
+                          key={`${size}-cp-${item.averageCostPrice}`}
+                          value={item.averageCostPrice}
+                          onCommit={(next) => setAverageCostPrice(size, next)}
                         />
                       </td>
-                      <td className="py-3 pr-4">{formatMoney(margin)}</td>
-                      <td className="py-3 pr-4">
+                      <td className="py-4 pr-4">
+                        <InlineMoneyField
+                          key={`${size}-sp-${item.sellingPrice}`}
+                          value={item.sellingPrice}
+                          onCommit={(next) => setSellingPrice(size, next)}
+                        />
+                      </td>
+                      <td className="py-4 pr-4">{formatMoney(margin)}</td>
+                      <td className="py-4 pr-4">
                         {isLow ? (
-                          <span className="inline-flex rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-100">
+                          <span className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-sm font-medium text-amber-700 ring-1 ring-amber-100">
                             Low stock
                           </span>
                         ) : (
-                          <span className="inline-flex rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-100">
+                          <span className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700 ring-1 ring-emerald-100">
                             OK
                           </span>
                         )}
                       </td>
-                      <td className="py-3 pr-4">
+                      <td className="py-4 pr-4">
                         <div className="flex items-center gap-2">
                           <Button
                             variant="secondary"
@@ -145,45 +161,11 @@ export function DashboardPage() {
             </table>
           </div>
         </Card>
-
-        <Card>
-          <div className="mb-3">
-            <div className="text-sm font-semibold">Recent Activity</div>
-            <div className="text-xs text-slate-500">Latest transactions</div>
-          </div>
-
-          <div className="space-y-3">
-            {transactions.slice(0, 8).map((t) => (
-              <div key={t.id} className="rounded-lg bg-slate-50 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-xs font-medium text-slate-700">
-                    {t.type === 'SALE' ? 'Sale' : 'Stock added'} • {t.size}
-                  </div>
-                  <div className="text-[11px] text-slate-500">
-                    {new Date(t.createdAt).toLocaleString()}
-                  </div>
-                </div>
-                <div className="mt-1 flex items-center justify-between gap-2 text-xs">
-                  <div className="text-slate-600">Qty: {formatNumber(t.quantity)}</div>
-                  {t.type === 'SALE' ? (
-                    <div className="font-medium text-slate-900">
-                      Profit: {formatMoney(t.profit)}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-
-            {transactions.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-500">
-                No transactions yet. Add stock or record a sale to get started.
-              </div>
-            ) : null}
-          </div>
-        </Card>
       </div>
 
-      <ChartsPanel />
+      <Suspense fallback={<div className="h-[320px] rounded-xl bg-white ring-1 ring-slate-200" />}>
+        <ChartsPanel />
+      </Suspense>
 
       {dialog.type === 'add' ? (
         <AddStockDialog
@@ -201,6 +183,87 @@ export function DashboardPage() {
           onSubmit={(input) => deductStock(input)}
         />
       ) : null}
+    </div>
+  )
+}
+
+function InventoryMobileCard({
+  size,
+  onAdd,
+  onDeduct,
+}: {
+  size: RodSize
+  onAdd: () => void
+  onDeduct: () => void
+}) {
+  const item = useInventoryStore((s) => s.items[size])
+  const setAverageCostPrice = useInventoryStore((s) => s.setAverageCostPrice)
+  const setSellingPrice = useInventoryStore((s) => s.setSellingPrice)
+
+  const margin = item.sellingPrice - item.averageCostPrice
+  const isLow = item.quantity < item.lowStockThreshold
+
+  return (
+    <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="inline-flex rounded-full bg-white px-3 py-1 text-sm font-medium text-slate-700 ring-1 ring-slate-200">
+          {size}
+        </div>
+        {isLow ? (
+          <span className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-sm font-medium text-amber-700 ring-1 ring-amber-100">
+            Low stock
+          </span>
+        ) : (
+          <span className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700 ring-1 ring-emerald-100">
+            OK
+          </span>
+        )}
+      </div>
+
+      <div className="mt-4 grid gap-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <div className="text-sm text-slate-500">Qty</div>
+            <div className="mt-1 text-lg font-semibold">{formatNumber(item.quantity)}</div>
+          </div>
+          <div>
+            <div className="text-sm text-slate-500">Margin</div>
+            <div className="mt-1 text-lg font-semibold">{formatMoney(margin)}</div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <div className="text-sm text-slate-500">CP (avg)</div>
+            <div className="mt-1">
+              <InlineMoneyField
+                key={`${size}-cp-mobile-${item.averageCostPrice}`}
+                value={item.averageCostPrice}
+                onCommit={(next) => setAverageCostPrice(size, next)}
+              />
+            </div>
+          </div>
+          <div>
+            <div className="text-sm text-slate-500">SP</div>
+            <div className="mt-1">
+              <InlineMoneyField
+                key={`${size}-sp-mobile-${item.sellingPrice}`}
+                value={item.sellingPrice}
+                onCommit={(next) => setSellingPrice(size, next)}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <Button className="flex-1" variant="secondary" type="button" onClick={onAdd}>
+            Add
+          </Button>
+          <Button className="flex-1" variant="secondary" type="button" onClick={onDeduct}>
+            Deduct
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -228,6 +291,7 @@ function AddStockDialog({
   return (
     <Modal
       open
+      size="xl"
       title={`Add Stock • ${size}`}
       onClose={close}
       footer={
@@ -322,6 +386,7 @@ function DeductStockDialog({
   return (
     <Modal
       open
+      size="xl"
       title={`Deduct Stock • ${size}`}
       onClose={close}
       footer={
@@ -389,5 +454,60 @@ function DeductStockDialog({
         ) : null}
       </div>
     </Modal>
+  )
+}
+
+function InlineMoneyField({
+  value,
+  onCommit,
+}: {
+  value: number
+  onCommit: (next: number) => void
+}) {
+  const [draft, setDraft] = useState(String(value))
+  const [error, setError] = useState<string | null>(null)
+
+  const reset = () => {
+    setDraft(String(value))
+    setError(null)
+  }
+
+  const commit = () => {
+    const parsed = Number(draft)
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setError('Enter a valid price.')
+      setDraft(String(value))
+      return
+    }
+    setError(null)
+    onCommit(parsed)
+  }
+
+  return (
+    <div className="max-w-[160px]">
+      <Input
+        inputMode="decimal"
+        type="number"
+        step="0.01"
+        min="0"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            ;(e.currentTarget as HTMLInputElement).blur()
+            return
+          }
+          if (e.key === 'Escape') {
+            reset()
+          }
+        }}
+        className={[
+          'min-h-11',
+          error ? 'ring-2 ring-rose-200 focus:ring-rose-300' : '',
+        ].join(' ')}
+      />
+      {error ? <div className="mt-1 text-sm text-rose-600">{error}</div> : null}
+    </div>
   )
 }

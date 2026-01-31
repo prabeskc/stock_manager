@@ -44,7 +44,7 @@ export function SettingsPage() {
       <Card>
         <div className="mb-3">
           <div className="text-sm font-semibold">Low Stock Thresholds</div>
-          <div className="text-xs text-slate-500">Used for the “Low stock” status badge</div>
+          <div className="text-sm text-slate-500">Used for the “Low stock” status badge</div>
         </div>
 
         <div className="grid gap-3 md:grid-cols-3">
@@ -62,7 +62,7 @@ export function SettingsPage() {
       <Card>
         <div className="mb-3">
           <div className="text-sm font-semibold">Data</div>
-          <div className="text-xs text-slate-500">
+          <div className="text-sm text-slate-500">
             Inventory is stored locally in your browser (localStorage).
           </div>
         </div>
@@ -95,14 +95,14 @@ export function SettingsPage() {
       <Card>
         <div className="mb-3">
           <div className="text-sm font-semibold">Google Sheets Sync</div>
-          <div className="text-xs text-slate-500">
+          <div className="text-sm text-slate-500">
             Requires server-side API (Vercel) with environment variables set.
           </div>
         </div>
 
         <div className="grid gap-3">
           <div className="grid gap-2">
-            <div className="text-xs font-medium text-slate-700">Sync Token</div>
+            <div className="text-base font-medium text-slate-700">Sync Token</div>
             <Input
               type="password"
               value={syncToken}
@@ -119,7 +119,7 @@ export function SettingsPage() {
               placeholder="Enter your sync token"
             />
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="text-xs text-slate-500">
+              <div className="text-sm text-slate-500">
                 Saved on this device (localStorage) so you don’t type it every time.
               </div>
               <Button
@@ -137,21 +137,22 @@ export function SettingsPage() {
                 Clear Token
               </Button>
             </div>
-            <div className="text-xs text-slate-500">
+            <div className="text-sm text-slate-500">
               This token is checked server-side to prevent others from reading/writing your sheet.
             </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
             <div className="grid gap-1">
-              <div className="text-xs font-medium text-slate-700">Auto Sync</div>
-              <div className="text-xs text-slate-500">
+              <div className="text-base font-medium text-slate-700">Auto Sync</div>
+              <div className="text-sm text-slate-500">
                 When enabled, the app imports updates and exports changes automatically.
               </div>
             </div>
-            <label className="flex select-none items-center gap-2 text-sm">
+            <label className="flex min-h-11 select-none items-center gap-2 rounded-md bg-white px-3 text-base ring-1 ring-slate-200">
               <input
                 type="checkbox"
+                className="h-5 w-5"
                 checked={autoSyncEnabled}
                 onChange={(e) => {
                   const next = e.target.checked
@@ -248,7 +249,7 @@ function ThresholdField({
 }) {
   return (
     <div className="rounded-lg bg-slate-50 p-3">
-      <div className="text-xs font-medium text-slate-700">{size}</div>
+      <div className="text-sm font-medium text-slate-700">{size}</div>
       <div className="mt-2">
         <Input
           type="number"

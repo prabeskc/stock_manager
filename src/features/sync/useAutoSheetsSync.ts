@@ -126,14 +126,17 @@ export function useAutoSheetsSync() {
       const data = getResponseData(json)
       if (isRecord(data) && isInventoryItems(data.items) && isTransactions(data.transactions)) {
         setAll({ items: data.items, transactions: data.transactions })
+        lastExportedPayloadRef.current = JSON.stringify({
+          items: data.items,
+          transactions: data.transactions,
+        })
       }
       hasImportedOnceRef.current = true
       lastRemoteUpdatedAtRef.current = updatedAt
-      lastExportedPayloadRef.current = payload
     } finally {
       importInFlightRef.current = false
     }
-  }, [authHeaders, payload, setAll])
+  }, [authHeaders, setAll])
 
   const exportToSheet = useCallback(async () => {
     if (!authHeaders) return
