@@ -15,12 +15,27 @@ export function SettingsPage() {
   const [confirming, setConfirming] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
-  const [syncToken, setSyncToken] = useState('')
+  const [syncToken, setSyncToken] = useState(() => {
+    try {
+      return localStorage.getItem('hardware-stock-manager:syncToken') ?? ''
+    } catch {
+      return ''
+    }
+  })
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(() => {
+    try {
+      const raw = localStorage.getItem('hardware-stock-manager:autoSyncEnabled')
+      if (raw == null) return true
+      return raw === 'true'
+    } catch {
+      return true
+    }
+  })
 
   const ensureJsonResponse = (res: Response) => {
     const contentType = res.headers.get('content-type') ?? ''
     if (!contentType.includes('application/json')) {
-      throw new Error('Google Sheets sync is not running locally. Deploy to Vercel and set env vars.')
+      throw new Error('Google Sheets API is not available. If local, run: npm run dev:full')
     }
   }
 
@@ -91,12 +106,65 @@ export function SettingsPage() {
             <Input
               type="password"
               value={syncToken}
-              onChange={(e) => setSyncToken(e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value
+                setSyncToken(next)
+                try {
+                  if (next) localStorage.setItem('hardware-stock-manager:syncToken', next)
+                  else localStorage.removeItem('hardware-stock-manager:syncToken')
+                } catch (err) {
+                  void err
+                }
+              }}
               placeholder="Enter your sync token"
             />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs text-slate-500">
+                Saved on this device (localStorage) so you don’t type it every time.
+              </div>
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => {
+                  setSyncToken('')
+                  try {
+                    localStorage.removeItem('hardware-stock-manager:syncToken')
+                  } catch (err) {
+                    void err
+                  }
+                }}
+              >
+                Clear Token
+              </Button>
+            </div>
             <div className="text-xs text-slate-500">
               This token is checked server-side to prevent others from reading/writing your sheet.
             </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
+            <div className="grid gap-1">
+              <div className="text-xs font-medium text-slate-700">Auto Sync</div>
+              <div className="text-xs text-slate-500">
+                When enabled, the app imports updates and exports changes automatically.
+              </div>
+            </div>
+            <label className="flex select-none items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={autoSyncEnabled}
+                onChange={(e) => {
+                  const next = e.target.checked
+                  setAutoSyncEnabled(next)
+                  try {
+                    localStorage.setItem('hardware-stock-manager:autoSyncEnabled', String(next))
+                  } catch (err) {
+                    void err
+                  }
+                }}
+              />
+              Enabled
+            </label>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">

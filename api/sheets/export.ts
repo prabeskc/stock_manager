@@ -1,4 +1,4 @@
-import { createSheetsClient, ensureSheetsExist, writeValues } from '../_lib/googleSheets.js'
+import { createSheetsClient, ensureSheetsExist, readValues, writeValues } from '../_lib/googleSheets.js'
 import type { ApiRequest, ApiResponse } from '../_lib/http.js'
 import { assertValidSyncToken, HttpError } from '../_lib/syncAuth.js'
 
@@ -18,6 +18,15 @@ function toString(value: unknown): string {
   return typeof value === 'string' ? value : String(value ?? '')
 }
 
+function getUpdatedAt(values: (string | number)[][]): string | null {
+  for (const row of values) {
+    const key = row[0]
+    const value = row[1]
+    if (key === 'updatedAt' && typeof value === 'string') return value
+  }
+  return null
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   try {
     if (req.method !== 'POST') {
@@ -34,7 +43,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
 
     const { sheets, spreadsheetId } = createSheetsClient()
-    await ensureSheetsExist({ sheets, spreadsheetId, sheetTitles: ['Items', 'Transactions'] })
+    await ensureSheetsExist({ sheets, spreadsheetId, sheetTitles: ['Items', 'Transactions', 'Meta'] })
 
     const itemsRecord =
       body.items && typeof body.items === 'object' ? (body.items as Record<string, unknown>) : {}
@@ -81,9 +90,25 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     await writeValues({ sheets, spreadsheetId, range: 'Items!A1', values: itemsRows })
     await writeValues({ sheets, spreadsheetId, range: 'Transactions!A1', values: txRows })
 
-    res
-      .status(200)
-      .json({ ok: true, exported: { items: ROD_SIZES.length, transactions: txs.length } })
+    const updatedAt = new Date().toISOString()
+    await writeValues({
+      sheets,
+      spreadsheetId,
+      range: 'Meta!A1',
+      values: [
+        ['key', 'value'],
+        ['updatedAt', updatedAt],
+      ],
+    })
+
+    const metaValues = await readValues({ sheets, spreadsheetId, range: 'Meta!A2:B10' })
+    const confirmedUpdatedAt = getUpdatedAt(metaValues) ?? updatedAt
+
+    res.status(200).json({
+      ok: true,
+      exported: { items: ROD_SIZES.length, transactions: txs.length },
+      meta: { updatedAt: confirmedUpdatedAt },
+    })
   } catch (e) {
     const statusCode = e instanceof HttpError ? e.statusCode : 500
     res.status(statusCode).json({

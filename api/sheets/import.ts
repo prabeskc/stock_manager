@@ -13,6 +13,15 @@ function toString(value: unknown): string {
   return typeof value === 'string' ? value : String(value ?? '')
 }
 
+function getUpdatedAt(values: (string | number)[][]): string | null {
+  for (const row of values) {
+    const key = row[0]
+    const value = row[1]
+    if (key === 'updatedAt' && typeof value === 'string') return value
+  }
+  return null
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   try {
     if (req.method !== 'GET') {
@@ -23,7 +32,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     assertValidSyncToken(req)
 
     const { sheets, spreadsheetId } = createSheetsClient()
-    await ensureSheetsExist({ sheets, spreadsheetId, sheetTitles: ['Items', 'Transactions'] })
+    await ensureSheetsExist({ sheets, spreadsheetId, sheetTitles: ['Items', 'Transactions', 'Meta'] })
 
     const itemsValues = await readValues({ sheets, spreadsheetId, range: 'Items!A2:E' })
     const transactionsValues = await readValues({
@@ -31,6 +40,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       spreadsheetId,
       range: 'Transactions!A2:H',
     })
+    const metaValues = await readValues({ sheets, spreadsheetId, range: 'Meta!A2:B10' })
+    const updatedAt = getUpdatedAt(metaValues)
 
     const items: Record<
       string,
@@ -73,7 +84,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         }
       })
 
-    res.status(200).json({ ok: true, data: { items, transactions } })
+    res.status(200).json({ ok: true, data: { items, transactions }, meta: { updatedAt } })
   } catch (e) {
     const statusCode = e instanceof HttpError ? e.statusCode : 500
     res.status(statusCode).json({

@@ -32,6 +32,13 @@ npm run preview
 npm run test
 ```
 
+If you want Google Sheets sync locally (backend + frontend together):
+
+```bash
+cp .env.example .env.local
+npm run dev:full
+```
+
 If `npm`/`node` are not available on your machine, install Node.js LTS. In this workspace a portable Node toolchain is placed under `.tools/` and is ignored by git.
 
 ## Deployment (Vercel)
@@ -62,6 +69,21 @@ Set these environment variables in Vercel (Project Settings → Environment Vari
 In the app, go to Settings → Google Sheets Sync and enter the same Sync Token before importing/exporting.
 
 For local development, copy `.env.example` → `.env.local` and fill values. Note: Vite `npm run dev` does not automatically run Vercel serverless routes; use a Vercel dev workflow if you want `/api/*` locally.
+
+Alternatively, this repo includes a local Express backend for development that proxies through Vite:
+
+- Start backend: `npm run server` (defaults to `http://localhost:8787`)
+- Start both: `npm run dev:full`
+
+### Always-On Sync (Access From Anywhere)
+
+The app supports automatic sync when Auto Sync is enabled:
+
+- On startup: imports the latest data from Google Sheets
+- On change: exports updates to Google Sheets (debounced)
+- Background: checks a `Meta` sheet timestamp and imports if it changed
+
+This is designed for convenience (last-write-wins). If you edit from two devices at the same time, the most recent export will overwrite previous changes.
 
 ## Security Note
 
