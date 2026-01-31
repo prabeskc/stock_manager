@@ -44,7 +44,7 @@ export function AppShell({ activeView, onChangeView, children }: AppShellProps) 
         </aside>
 
         <div className="min-w-0 flex-1">
-          <div className="mb-3 text-center text-lg font-semibold tracking-wide text-slate-900 sm:text-xl">
+          <div className="mb-3 text-left text-lg font-semibold tracking-wide text-slate-900 sm:text-xl">
             AFNAI SHIVA SHAKTI HARDWARE
           </div>
           <header className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-white p-4 ring-1 ring-slate-200">
