@@ -46,9 +46,11 @@ export function AppShell({ activeView, onChangeView, children }: AppShellProps) 
         <div className="min-w-0 flex-1">
           <header className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-white p-4 ring-1 ring-slate-200">
             <div className="min-w-0">
-              <div className="truncate text-base font-semibold">Iron Rod Inventory Dashboard</div>
+              <div className="truncate text-base font-bold uppercase tracking-wide">
+                AFNAI SHIVASHATI HARDWARE
+              </div>
               <div className="truncate text-sm text-slate-500">
-                Track 8mm, 10mm, 12mm stock, CP/SP, and profit
+                Track iron rods and cement stock, CP/SP, and profit
               </div>
             </div>
             <div className="hidden items-center gap-2 md:flex">

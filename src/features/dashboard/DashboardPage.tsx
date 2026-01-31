@@ -89,7 +89,7 @@ export function DashboardPage() {
         <Card>
           <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="text-base font-semibold">Iron Rod Inventory</div>
+              <div className="text-base font-bold uppercase tracking-wide">STOCK INVENTORY</div>
               <div className="text-sm text-slate-500">Manage stock by rod size</div>
             </div>
             <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
