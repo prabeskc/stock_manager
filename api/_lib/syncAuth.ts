@@ -1,4 +1,4 @@
-import type { ApiRequest } from './http'
+import type { ApiRequest } from './http.js'
 
 export class HttpError extends Error {
   readonly statusCode: number

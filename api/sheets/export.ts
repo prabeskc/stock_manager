@@ -1,6 +1,6 @@
-import { createSheetsClient, ensureSheetsExist, writeValues } from '../_lib/googleSheets'
-import type { ApiRequest, ApiResponse } from '../_lib/http'
-import { assertValidSyncToken, HttpError } from '../_lib/syncAuth'
+import { createSheetsClient, ensureSheetsExist, writeValues } from '../_lib/googleSheets.js'
+import type { ApiRequest, ApiResponse } from '../_lib/http.js'
+import { assertValidSyncToken, HttpError } from '../_lib/syncAuth.js'
 
 type ExportBody = {
   items: Record<string, unknown>

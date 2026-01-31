@@ -1,6 +1,6 @@
-import { createSheetsClient, ensureSheetsExist, readValues } from '../_lib/googleSheets'
-import type { ApiRequest, ApiResponse } from '../_lib/http'
-import { assertValidSyncToken, HttpError } from '../_lib/syncAuth'
+import { createSheetsClient, ensureSheetsExist, readValues } from '../_lib/googleSheets.js'
+import type { ApiRequest, ApiResponse } from '../_lib/http.js'
+import { assertValidSyncToken, HttpError } from '../_lib/syncAuth.js'
 
 const ROD_SIZES = ['8mm', '10mm', '12mm'] as const
 
