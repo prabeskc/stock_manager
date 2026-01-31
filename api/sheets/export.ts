@@ -5,9 +5,12 @@ import { assertValidSyncToken, HttpError } from '../_lib/syncAuth.js'
 type ExportBody = {
   items: Record<string, unknown>
   transactions: unknown
+  cementItems?: Record<string, unknown>
+  cementTransactions?: unknown
 }
 
 const ROD_SIZES = ['8mm', '10mm', '12mm'] as const
+const CEMENT_PRODUCTS = ['PPC', 'OPC'] as const
 
 function toNumber(value: unknown): number {
   const n = typeof value === 'number' ? value : Number(value)
@@ -44,13 +47,22 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
 
     const { sheets, spreadsheetId } = createSheetsClient()
-    await ensureSheetsExist({ sheets, spreadsheetId, sheetTitles: ['Items', 'Transactions', 'Meta'] })
+    await ensureSheetsExist({
+      sheets,
+      spreadsheetId,
+      sheetTitles: ['Items', 'Transactions', 'CementTransactions', 'Meta'],
+    })
 
     const itemsRecord =
       body.items && typeof body.items === 'object' ? (body.items as Record<string, unknown>) : {}
 
-    const itemsRows: (string | number)[][] = [
-      ['size', 'quantity', 'averageCostPrice', 'sellingPrice', 'lowStockThreshold'],
+    const cementItemsRecord =
+      body.cementItems && typeof body.cementItems === 'object'
+        ? (body.cementItems as Record<string, unknown>)
+        : {}
+
+    const inventoryRows: (string | number)[][] = [
+      ['Iron Rod', 'quantity', 'averageCostPrice', 'sellingPrice', 'lowStockThreshold'],
       ...ROD_SIZES.map((size) => {
         const maybeItem = itemsRecord[size]
         const item =
@@ -59,6 +71,22 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             : {}
         return [
           size,
+          toNumber(item.quantity),
+          toNumber(item.averageCostPrice),
+          toNumber(item.sellingPrice),
+          Math.round(toNumber(item.lowStockThreshold)),
+        ]
+      }),
+      ['', '', '', '', ''],
+      ['Cement', 'quantity', 'averageCostPrice', 'sellingPrice', 'lowStockThreshold'],
+      ...CEMENT_PRODUCTS.map((product) => {
+        const maybeItem = cementItemsRecord[product]
+        const item =
+          maybeItem && typeof maybeItem === 'object'
+            ? (maybeItem as Record<string, unknown>)
+            : {}
+        return [
+          product,
           toNumber(item.quantity),
           toNumber(item.averageCostPrice),
           toNumber(item.sellingPrice),
@@ -88,8 +116,31 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       }),
     ]
 
-    await writeValues({ sheets, spreadsheetId, range: 'Items!A1', values: itemsRows })
+    await writeValues({ sheets, spreadsheetId, range: 'Items!A1', values: inventoryRows })
     await writeValues({ sheets, spreadsheetId, range: 'Transactions!A1', values: txRows })
+
+    const cementTxs = Array.isArray(body.cementTransactions) ? body.cementTransactions : []
+    const cementTxRows: (string | number | null)[][] = [
+      ['id', 'type', 'product', 'quantity', 'unitCost', 'unitPrice', 'profit', 'createdAt'],
+      ...cementTxs.map((t) => {
+        const tx = t && typeof t === 'object' ? (t as Record<string, unknown>) : {}
+        const unitCost = tx.unitCost
+        const unitPrice = tx.unitPrice
+
+        return [
+          toString(tx.id),
+          toString(tx.type),
+          toString(tx.product),
+          toNumber(tx.quantity),
+          unitCost == null ? null : toNumber(unitCost),
+          unitPrice == null ? null : toNumber(unitPrice),
+          toNumber(tx.profit),
+          toString(tx.createdAt),
+        ]
+      }),
+    ]
+
+    await writeValues({ sheets, spreadsheetId, range: 'CementTransactions!A1', values: cementTxRows })
 
     const updatedAt = new Date().toISOString()
     await writeValues({
@@ -107,7 +158,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     res.status(200).json({
       ok: true,
-      exported: { items: ROD_SIZES.length, transactions: txs.length },
+      exported: {
+        items: ROD_SIZES.length,
+        transactions: txs.length,
+        cementItems: CEMENT_PRODUCTS.length,
+        cementTransactions: cementTxs.length,
+      },
       meta: { updatedAt: confirmedUpdatedAt },
     })
   } catch (e) {

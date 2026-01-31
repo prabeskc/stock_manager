@@ -87,6 +87,14 @@ The app supports automatic sync when Auto Sync is enabled:
 
 This is designed for convenience (last-write-wins). If you edit from two devices at the same time, the most recent export will overwrite previous changes.
 
+### Sheets Layout
+
+The Google Sheet will contain these tabs:
+
+- `Items` and `Transactions` (iron rods)
+- `Cement` and `CementTransactions`
+- `Meta` (sync timestamp)
+
 ### Troubleshooting Sync (Stale Data)
 
 - Open Settings → Google Sheets Sync and check the Sync Status (last import/export, errors, failures).

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ROD_SIZES, type RodSize } from '../../domain/inventory'
+import { CEMENT_PRODUCTS, ROD_SIZES, type CementProduct, type RodSize } from '../../domain/inventory'
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
@@ -9,7 +9,10 @@ import { bumpRetryRequest, readSyncStatus, updateSyncStatus } from '../sync/sync
 export function SettingsPage() {
   const items = useInventoryStore((s) => s.items)
   const transactions = useInventoryStore((s) => s.transactions)
+  const cementItems = useInventoryStore((s) => s.cementItems)
+  const cementTransactions = useInventoryStore((s) => s.cementTransactions)
   const setLowStockThreshold = useInventoryStore((s) => s.setLowStockThreshold)
+  const setCementLowStockThreshold = useInventoryStore((s) => s.setCementLowStockThreshold)
   const setAll = useInventoryStore((s) => s.setAll)
   const reset = useInventoryStore((s) => s.reset)
 
@@ -61,6 +64,14 @@ export function SettingsPage() {
               size={size}
               value={items[size].lowStockThreshold}
               onChange={(next) => setLowStockThreshold(size, next)}
+            />
+          ))}
+          {CEMENT_PRODUCTS.map((product) => (
+            <CementThresholdField
+              key={product}
+              product={product}
+              value={cementItems[product].lowStockThreshold}
+              onChange={(next) => setCementLowStockThreshold(product, next)}
             />
           ))}
         </div>
@@ -269,7 +280,7 @@ export function SettingsPage() {
                 const res = await fetch('/api/sheets/export', {
                   method: 'POST',
                   headers: { 'content-type': 'application/json', 'x-sync-token': syncToken },
-                  body: JSON.stringify({ items, transactions }),
+                  body: JSON.stringify({ items, transactions, cementItems, cementTransactions }),
                 })
                 ensureJsonResponse(res)
                 const json = await res.json().catch(() => null)
@@ -322,6 +333,32 @@ function ThresholdField({
   return (
     <div className="rounded-lg bg-slate-50 p-3">
       <div className="text-sm font-medium text-slate-700">{size}</div>
+      <div className="mt-2">
+        <Input
+          type="number"
+          inputMode="numeric"
+          min="0"
+          step="1"
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+        />
+      </div>
+    </div>
+  )
+}
+
+function CementThresholdField({
+  product,
+  value,
+  onChange,
+}: {
+  product: CementProduct
+  value: number
+  onChange: (next: number) => void
+}) {
+  return (
+    <div className="rounded-lg bg-slate-50 p-3">
+      <div className="text-sm font-medium text-slate-700">{product}</div>
       <div className="mt-2">
         <Input
           type="number"

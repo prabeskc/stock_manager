@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useInventoryStore } from '../../store/inventoryStore'
-import type { InventoryItem, InventoryTransaction, RodSize } from '../../domain/inventory'
+import type {
+  CementProduct,
+  CementTransaction,
+  InventoryItem,
+  InventoryTransaction,
+  RodSize,
+} from '../../domain/inventory'
 import { computeBackoffMs } from './backoff'
 import {
   AUTO_SYNC_KEY,
@@ -38,6 +44,10 @@ function isRodSize(value: unknown): value is RodSize {
   return value === '8mm' || value === '10mm' || value === '12mm'
 }
 
+function isCementProduct(value: unknown): value is CementProduct {
+  return value === 'PPC' || value === 'OPC'
+}
+
 function isInventoryItem(value: unknown): value is InventoryItem {
   if (!isRecord(value)) return false
   return (
@@ -57,6 +67,11 @@ function isInventoryItems(value: unknown): value is Record<RodSize, InventoryIte
   )
 }
 
+function isCementItems(value: unknown): value is Record<CementProduct, InventoryItem> {
+  if (!isRecord(value)) return false
+  return isInventoryItem(value.PPC) && isInventoryItem(value.OPC)
+}
+
 function isTransaction(value: unknown): value is InventoryTransaction {
   if (!isRecord(value)) return false
   return (
@@ -73,6 +88,24 @@ function isTransaction(value: unknown): value is InventoryTransaction {
 
 function isTransactions(value: unknown): value is InventoryTransaction[] {
   return Array.isArray(value) && value.every(isTransaction)
+}
+
+function isCementTransaction(value: unknown): value is CementTransaction {
+  if (!isRecord(value)) return false
+  return (
+    typeof value.id === 'string' &&
+    (value.type === 'ADD' || value.type === 'SALE') &&
+    isCementProduct(value.product) &&
+    typeof value.quantity === 'number' &&
+    (typeof value.unitCost === 'number' || value.unitCost === null) &&
+    (typeof value.unitPrice === 'number' || value.unitPrice === null) &&
+    typeof value.profit === 'number' &&
+    typeof value.createdAt === 'string'
+  )
+}
+
+function isCementTransactions(value: unknown): value is CementTransaction[] {
+  return Array.isArray(value) && value.every(isCementTransaction)
 }
 
 function getMetaUpdatedAt(value: unknown): string | null {
@@ -120,6 +153,8 @@ function formatFetchError({
 export function useAutoSheetsSync() {
   const items = useInventoryStore((s) => s.items)
   const transactions = useInventoryStore((s) => s.transactions)
+  const cementItems = useInventoryStore((s) => s.cementItems)
+  const cementTransactions = useInventoryStore((s) => s.cementTransactions)
   const setAll = useInventoryStore((s) => s.setAll)
 
   const [syncState, setSyncState] = useState<SyncState>(() => ({ enabled: false, token: '' }))
@@ -130,7 +165,10 @@ export function useAutoSheetsSync() {
     return () => window.clearInterval(id)
   }, [])
 
-  const payload = useMemo(() => JSON.stringify({ items, transactions }), [items, transactions])
+  const payload = useMemo(
+    () => JSON.stringify({ items, transactions, cementItems, cementTransactions }),
+    [items, transactions, cementItems, cementTransactions],
+  )
 
   const lastExportedPayloadRef = useRef<string | null>(null)
   const lastRemoteUpdatedAtRef = useRef<string | null>(null)
@@ -168,11 +206,31 @@ export function useAutoSheetsSync() {
 
       const updatedAt = getMetaUpdatedAt(json)
       const data = getResponseData(json)
-      if (isRecord(data) && isInventoryItems(data.items) && isTransactions(data.transactions)) {
-        setAll({ items: data.items, transactions: data.transactions })
+      if (
+        isRecord(data) &&
+        isInventoryItems(data.items) &&
+        isTransactions(data.transactions) &&
+        (!('cementItems' in data) || isCementItems(data.cementItems)) &&
+        (!('cementTransactions' in data) || isCementTransactions(data.cementTransactions))
+      ) {
+        const nextCementItems =
+          'cementItems' in data && isCementItems(data.cementItems) ? data.cementItems : undefined
+        const nextCementTransactions =
+          'cementTransactions' in data && isCementTransactions(data.cementTransactions)
+            ? data.cementTransactions
+            : undefined
+
+        setAll({
+          items: data.items,
+          transactions: data.transactions,
+          cementItems: nextCementItems,
+          cementTransactions: nextCementTransactions,
+        })
         lastExportedPayloadRef.current = JSON.stringify({
           items: data.items,
           transactions: data.transactions,
+          cementItems: nextCementItems,
+          cementTransactions: nextCementTransactions,
         })
       }
       hasImportedOnceRef.current = true

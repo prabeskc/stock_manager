@@ -1,21 +1,27 @@
-import { ROD_SIZES } from '../../domain/inventory'
+import { CEMENT_PRODUCTS, ROD_SIZES } from '../../domain/inventory'
 import { Card } from '../../components/ui/Card'
 import { useInventoryStore } from '../../store/inventoryStore'
 import { formatMoney, formatNumber } from '../../utils/format'
 
 export function TransactionsPage() {
   const transactions = useInventoryStore((s) => s.transactions)
+  const cementTransactions = useInventoryStore((s) => s.cementTransactions)
+
+  const all = [
+    ...transactions.map((t) => ({ kind: 'rod' as const, t })),
+    ...cementTransactions.map((t) => ({ kind: 'cement' as const, t })),
+  ].sort((a, b) => Number(new Date(b.t.createdAt)) - Number(new Date(a.t.createdAt)))
 
   return (
     <Card>
       <div className="mb-3">
         <div className="text-base font-semibold">Transactions</div>
-        <div className="text-sm text-slate-500">All stock adds and sales</div>
+        <div className="text-sm text-slate-500">All stock adds and sales (rods + cement)</div>
       </div>
 
       <div className="space-y-3 lg:hidden">
-        {transactions.map((t) => (
-          <div key={t.id} className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
+        {all.map(({ kind, t }) => (
+          <div key={`${kind}:${t.id}`} className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span
                 className={[
@@ -33,8 +39,10 @@ export function TransactionsPage() {
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <div className="text-sm text-slate-500">Size</div>
-                  <div className="mt-1 text-base font-semibold">{t.size}</div>
+                  <div className="text-sm text-slate-500">Item</div>
+                  <div className="mt-1 text-base font-semibold">
+                    {kind === 'rod' ? t.size : t.product}
+                  </div>
                 </div>
                 <div>
                   <div className="text-sm text-slate-500">Qty</div>
@@ -74,7 +82,7 @@ export function TransactionsPage() {
             <tr className="border-b border-slate-100">
               <th className="py-3 pr-4 font-medium">Date</th>
               <th className="py-3 pr-4 font-medium">Type</th>
-              <th className="py-3 pr-4 font-medium">Size</th>
+              <th className="py-3 pr-4 font-medium">Item</th>
               <th className="py-3 pr-4 font-medium">Qty</th>
               <th className="py-3 pr-4 font-medium">Unit Cost</th>
               <th className="py-3 pr-4 font-medium">Unit Price</th>
@@ -82,8 +90,8 @@ export function TransactionsPage() {
             </tr>
           </thead>
           <tbody>
-            {transactions.map((t) => (
-              <tr key={t.id} className="border-b border-slate-50">
+            {all.map(({ kind, t }) => (
+              <tr key={`${kind}:${t.id}`} className="border-b border-slate-50">
                 <td className="py-4 pr-4 text-sm text-slate-600">
                   {new Date(t.createdAt).toLocaleString()}
                 </td>
@@ -99,7 +107,7 @@ export function TransactionsPage() {
                     {t.type}
                   </span>
                 </td>
-                <td className="py-4 pr-4">{t.size}</td>
+                <td className="py-4 pr-4">{kind === 'rod' ? t.size : t.product}</td>
                 <td className="py-4 pr-4">{formatNumber(t.quantity)}</td>
                 <td className="py-4 pr-4">{t.unitCost == null ? '—' : formatMoney(t.unitCost)}</td>
                 <td className="py-4 pr-4">
@@ -112,14 +120,14 @@ export function TransactionsPage() {
         </table>
       </div>
 
-      {transactions.length === 0 ? (
+      {all.length === 0 ? (
         <div className="mt-4 rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-500">
           No transactions yet.
         </div>
       ) : null}
 
       <div className="mt-4 text-sm text-slate-500">
-        Sizes tracked: {ROD_SIZES.join(', ')}
+        Rod sizes: {ROD_SIZES.join(', ')} • Cement: {CEMENT_PRODUCTS.join(', ')}
       </div>
     </Card>
   )

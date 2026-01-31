@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import type { InventoryItem, InventoryTransaction, RodSize } from '../domain/inventory'
+import type {
+  CementProduct,
+  CementTransaction,
+  InventoryItem,
+  InventoryTransaction,
+  RodSize,
+} from '../domain/inventory'
 import { createId } from '../utils/id'
 import {
   computeSaleProfit,
@@ -9,6 +15,7 @@ import {
 import { roundMoney, toNonNegativeNumber } from '../utils/number'
 
 type InventoryItems = Record<RodSize, InventoryItem>
+type CementItems = Record<CementProduct, InventoryItem>
 
 type AddStockInput = {
   size: RodSize
@@ -22,15 +29,39 @@ type DeductStockInput = {
   unitSellingPrice?: number
 }
 
+type AddCementStockInput = {
+  product: CementProduct
+  quantity: number
+  unitCostPrice: number
+}
+
+type DeductCementStockInput = {
+  product: CementProduct
+  quantity: number
+  unitSellingPrice?: number
+}
+
 export type InventoryStoreState = {
   items: InventoryItems
   transactions: InventoryTransaction[]
+  cementItems: CementItems
+  cementTransactions: CementTransaction[]
   addStock: (input: AddStockInput) => void
   deductStock: (input: DeductStockInput) => void
+  addCementStock: (input: AddCementStockInput) => void
+  deductCementStock: (input: DeductCementStockInput) => void
   setAverageCostPrice: (size: RodSize, averageCostPrice: number) => void
   setSellingPrice: (size: RodSize, unitSellingPrice: number) => void
   setLowStockThreshold: (size: RodSize, lowStockThreshold: number) => void
-  setAll: (data: { items: InventoryItems; transactions: InventoryTransaction[] }) => void
+  setCementAverageCostPrice: (product: CementProduct, averageCostPrice: number) => void
+  setCementSellingPrice: (product: CementProduct, unitSellingPrice: number) => void
+  setCementLowStockThreshold: (product: CementProduct, lowStockThreshold: number) => void
+  setAll: (data: {
+    items: InventoryItems
+    transactions: InventoryTransaction[]
+    cementItems?: CementItems
+    cementTransactions?: CementTransaction[]
+  }) => void
   reset: () => void
 }
 
@@ -38,6 +69,11 @@ const defaultItems: InventoryItems = {
   '8mm': { quantity: 0, averageCostPrice: 0, sellingPrice: 0, lowStockThreshold: 10 },
   '10mm': { quantity: 0, averageCostPrice: 0, sellingPrice: 0, lowStockThreshold: 10 },
   '12mm': { quantity: 0, averageCostPrice: 0, sellingPrice: 0, lowStockThreshold: 10 },
+}
+
+const defaultCementItems: CementItems = {
+  PPC: { quantity: 0, averageCostPrice: 0, sellingPrice: 0, lowStockThreshold: 10 },
+  OPC: { quantity: 0, averageCostPrice: 0, sellingPrice: 0, lowStockThreshold: 10 },
 }
 
 const STORAGE_KEY = 'hardware-stock-manager:v1'
@@ -48,6 +84,8 @@ export const useInventoryStore = create<InventoryStoreState>()(
     (set, get) => ({
       items: defaultItems,
       transactions: [],
+      cementItems: defaultCementItems,
+      cementTransactions: [],
       addStock: (input) => {
         const quantity = toNonNegativeNumber(input.quantity)
         const unitCostPrice = roundMoney(input.unitCostPrice)
@@ -141,6 +179,97 @@ export const useInventoryStore = create<InventoryStoreState>()(
           }
         })
       },
+      addCementStock: (input) => {
+        const quantity = toNonNegativeNumber(input.quantity)
+        const unitCostPrice = roundMoney(input.unitCostPrice)
+        if (quantity === 0) return
+
+        set((state) => {
+          const currentItem = state.cementItems[input.product]
+          const nextQuantity = currentItem.quantity + quantity
+          const nextAverageCostPrice = computeWeightedAverageCostPrice({
+            currentQuantity: currentItem.quantity,
+            currentAverageCostPrice: currentItem.averageCostPrice,
+            addedQuantity: quantity,
+            addedUnitCostPrice: unitCostPrice,
+          })
+
+          const transaction: CementTransaction = {
+            id: createId(),
+            type: 'ADD',
+            product: input.product,
+            quantity,
+            unitCost: unitCostPrice,
+            unitPrice: null,
+            profit: 0,
+            createdAt: new Date().toISOString(),
+          }
+
+          const transactions = [transaction, ...state.cementTransactions].slice(
+            0,
+            MAX_TRANSACTIONS,
+          )
+
+          return {
+            cementItems: {
+              ...state.cementItems,
+              [input.product]: {
+                ...currentItem,
+                quantity: nextQuantity,
+                averageCostPrice: nextAverageCostPrice,
+              },
+            },
+            cementTransactions: transactions,
+          }
+        })
+      },
+      deductCementStock: (input) => {
+        const quantity = toNonNegativeNumber(input.quantity)
+        if (quantity === 0) return
+
+        const currentItem = get().cementItems[input.product]
+        if (quantity > currentItem.quantity) {
+          throw new Error('Cannot deduct more stock than available.')
+        }
+
+        const unitSellingPrice = roundMoney(input.unitSellingPrice ?? currentItem.sellingPrice)
+        const unitCostPrice = currentItem.averageCostPrice
+        const profit = computeSaleProfit({
+          quantity,
+          unitSellingPrice,
+          unitCostPrice,
+        })
+
+        set((state) => {
+          const transaction: CementTransaction = {
+            id: createId(),
+            type: 'SALE',
+            product: input.product,
+            quantity,
+            unitCost: unitCostPrice,
+            unitPrice: unitSellingPrice,
+            profit,
+            createdAt: new Date().toISOString(),
+          }
+
+          const transactions = [transaction, ...state.cementTransactions].slice(
+            0,
+            MAX_TRANSACTIONS,
+          )
+
+          return {
+            cementItems: {
+              ...state.cementItems,
+              [input.product]: {
+                ...state.cementItems[input.product],
+                quantity: state.cementItems[input.product].quantity - quantity,
+                sellingPrice: unitSellingPrice,
+              },
+            },
+            cementTransactions: transactions,
+          }
+        })
+      },
       setAverageCostPrice: (size, averageCostPrice) => {
         const value = roundMoney(averageCostPrice)
         set((state) => ({
@@ -165,6 +294,33 @@ export const useInventoryStore = create<InventoryStoreState>()(
           },
         }))
       },
+      setCementAverageCostPrice: (product, averageCostPrice) => {
+        const value = roundMoney(averageCostPrice)
+        set((state) => ({
+          cementItems: {
+            ...state.cementItems,
+            [product]: { ...state.cementItems[product], averageCostPrice: value },
+          },
+        }))
+      },
+      setCementSellingPrice: (product, unitSellingPrice) => {
+        const value = roundMoney(unitSellingPrice)
+        set((state) => ({
+          cementItems: {
+            ...state.cementItems,
+            [product]: { ...state.cementItems[product], sellingPrice: value },
+          },
+        }))
+      },
+      setCementLowStockThreshold: (product, lowStockThreshold) => {
+        const value = Math.round(toNonNegativeNumber(lowStockThreshold))
+        set((state) => ({
+          cementItems: {
+            ...state.cementItems,
+            [product]: { ...state.cementItems[product], lowStockThreshold: value },
+          },
+        }))
+      },
       setAll: (data) => {
         const nextItems: InventoryItems = {
           '8mm': { ...defaultItems['8mm'], ...(data.items['8mm'] ?? {}) },
@@ -177,17 +333,41 @@ export const useInventoryStore = create<InventoryStoreState>()(
           MAX_TRANSACTIONS,
         )
 
-        set({ items: nextItems, transactions: nextTransactions })
+        const cementItems = data.cementItems ?? defaultCementItems
+        const nextCementItems: CementItems = {
+          PPC: { ...defaultCementItems.PPC, ...(cementItems.PPC ?? {}) },
+          OPC: { ...defaultCementItems.OPC, ...(cementItems.OPC ?? {}) },
+        }
+        const nextCementTransactions = (
+          Array.isArray(data.cementTransactions) ? data.cementTransactions : []
+        ).slice(0, MAX_TRANSACTIONS)
+
+        set({
+          items: nextItems,
+          transactions: nextTransactions,
+          cementItems: nextCementItems,
+          cementTransactions: nextCementTransactions,
+        })
       },
       reset: () => {
-        set({ items: defaultItems, transactions: [] })
+        set({
+          items: defaultItems,
+          transactions: [],
+          cementItems: defaultCementItems,
+          cementTransactions: [],
+        })
       },
     }),
     {
       name: STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
       version: 1,
-      partialize: (state) => ({ items: state.items, transactions: state.transactions }),
+      partialize: (state) => ({
+        items: state.items,
+        transactions: state.transactions,
+        cementItems: state.cementItems,
+        cementTransactions: state.cementTransactions,
+      }),
     },
   ),
 )
