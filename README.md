@@ -1,0 +1,68 @@
+# Hardware Stock Manager – Iron Rod Inventory Dashboard
+
+Modern, responsive inventory dashboard for iron rods by size (8mm, 10mm, 12mm). Frontend-only (localStorage), suitable for daily business use and deployable to Vercel.
+
+## Features
+
+- Add stock and deduct stock (sales) per rod size
+- Track CP (weighted average cost), SP (selling price), and auto-calculate profit on sales
+- Dashboard KPIs + charts (Recharts) for stock levels and profit trend
+- Transactions history and basic settings (low-stock thresholds, reset)
+- Persists data locally in the browser (no backend required)
+
+## Tech Stack
+
+- React + Vite + TypeScript
+- Tailwind CSS
+- Zustand (state + localStorage persistence)
+- Recharts (charts)
+
+## Local Development
+
+```bash
+npm install
+npm run dev
+```
+
+Other scripts:
+
+```bash
+npm run build
+npm run preview
+npm run test
+```
+
+If `npm`/`node` are not available on your machine, install Node.js LTS. In this workspace a portable Node toolchain is placed under `.tools/` and is ignored by git.
+
+## Deployment (Vercel)
+
+- Import the repository into Vercel
+- Framework preset: Vite
+- Build command: `npm run build`
+- Output directory: `dist`
+
+`vercel.json` includes an SPA fallback route so dashboard navigation works on refresh.
+
+## Google Sheets Sync (Recommended Secure Approach)
+
+Do not use a `credentials.json` file in the frontend. A service-account private key must stay on the server.
+
+This project includes Vercel Serverless API routes:
+
+- `GET /api/sheets/import`
+- `POST /api/sheets/export`
+
+Set these environment variables in Vercel (Project Settings → Environment Variables):
+
+- `GOOGLE_SHEET_ID`
+- `GOOGLE_CLIENT_EMAIL`
+- `GOOGLE_PRIVATE_KEY` (store the full key; if it contains newlines, paste it with literal `\n`)
+- `SHEETS_SYNC_TOKEN` (random password you choose; required for Import/Export)
+
+In the app, go to Settings → Google Sheets Sync and enter the same Sync Token before importing/exporting.
+
+For local development, copy `.env.example` → `.env.local` and fill values. Note: Vite `npm run dev` does not automatically run Vercel serverless routes; use a Vercel dev workflow if you want `/api/*` locally.
+
+## Security Note
+
+This repo previously contained a service-account `credentials.json` with a private key. If that file was ever committed or pushed, treat it as compromised and rotate/revoke the key in the provider console. Do not store secrets in the frontend or commit them into the repository.
