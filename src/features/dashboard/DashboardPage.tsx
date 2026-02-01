@@ -596,7 +596,7 @@ function AddStockDialog({
     >
       <div className="space-y-3">
         <div className="grid gap-2">
-          <div className="text-sm font-medium text-slate-700">Quantity (pcs)</div>
+          <div className="text-sm font-medium text-slate-700">Quantity (kg)</div>
           <Input
             inputMode="numeric"
             type="number"
@@ -720,7 +720,7 @@ function DeductStockDialog({
     >
       <div className="space-y-3">
         <div className="grid gap-2">
-          <div className="text-sm font-medium text-slate-700">Quantity (pcs)</div>
+          <div className="text-sm font-medium text-slate-700">Quantity (kg)</div>
           <Input
             inputMode="numeric"
             type="number"
