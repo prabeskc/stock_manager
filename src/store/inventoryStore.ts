@@ -20,12 +20,14 @@ type CementItems = Record<CementProduct, InventoryItem>
 type AddStockInput = {
   size: RodSize
   quantity: number
+  bundles?: number
   unitCostPrice: number
 }
 
 type DeductStockInput = {
   size: RodSize
   quantity: number
+  bundles?: number
   unitSellingPrice?: number
 }
 
@@ -66,9 +68,9 @@ export type InventoryStoreState = {
 }
 
 const defaultItems: InventoryItems = {
-  '8mm': { quantity: 0, averageCostPrice: 0, sellingPrice: 0, lowStockThreshold: 10 },
-  '10mm': { quantity: 0, averageCostPrice: 0, sellingPrice: 0, lowStockThreshold: 10 },
-  '12mm': { quantity: 0, averageCostPrice: 0, sellingPrice: 0, lowStockThreshold: 10 },
+  '8mm': { quantity: 0, bundles: 0, averageCostPrice: 0, sellingPrice: 0, lowStockThreshold: 10 },
+  '10mm': { quantity: 0, bundles: 0, averageCostPrice: 0, sellingPrice: 0, lowStockThreshold: 10 },
+  '12mm': { quantity: 0, bundles: 0, averageCostPrice: 0, sellingPrice: 0, lowStockThreshold: 10 },
 }
 
 const defaultCementItems: CementItems = {
@@ -88,8 +90,9 @@ export const useInventoryStore = create<InventoryStoreState>()(
       cementTransactions: [],
       addStock: (input) => {
         const quantity = toNonNegativeNumber(input.quantity)
+        const bundles = Math.round(toNonNegativeNumber(input.bundles ?? 0))
         const unitCostPrice = roundMoney(input.unitCostPrice)
-        if (quantity === 0) return
+        if (quantity === 0 && bundles === 0) return
 
         set((state) => {
           const currentItem = state.items[input.size]
@@ -100,12 +103,15 @@ export const useInventoryStore = create<InventoryStoreState>()(
             addedQuantity: quantity,
             addedUnitCostPrice: unitCostPrice,
           })
+          const currentBundles = Math.round(toNonNegativeNumber(currentItem.bundles ?? 0))
+          const nextBundles = currentBundles + bundles
 
           const transaction: InventoryTransaction = {
             id: createId(),
             type: 'ADD',
             size: input.size,
             quantity,
+            bundles,
             unitCost: unitCostPrice,
             unitPrice: null,
             profit: 0,
@@ -123,6 +129,7 @@ export const useInventoryStore = create<InventoryStoreState>()(
               [input.size]: {
                 ...currentItem,
                 quantity: nextQuantity,
+                bundles: nextBundles,
                 averageCostPrice: nextAverageCostPrice,
               },
             },
@@ -132,11 +139,16 @@ export const useInventoryStore = create<InventoryStoreState>()(
       },
       deductStock: (input) => {
         const quantity = toNonNegativeNumber(input.quantity)
-        if (quantity === 0) return
+        const bundles = Math.round(toNonNegativeNumber(input.bundles ?? 0))
+        if (quantity === 0 && bundles === 0) return
 
         const currentItem = get().items[input.size]
         if (quantity > currentItem.quantity) {
           throw new Error('Cannot deduct more stock than available.')
+        }
+        const currentBundles = Math.round(toNonNegativeNumber(currentItem.bundles ?? 0))
+        if (bundles > currentBundles) {
+          throw new Error('Cannot deduct more bundles than available.')
         }
 
         const unitSellingPrice = roundMoney(
@@ -155,6 +167,7 @@ export const useInventoryStore = create<InventoryStoreState>()(
             type: 'SALE',
             size: input.size,
             quantity,
+            bundles,
             unitCost: unitCostPrice,
             unitPrice: unitSellingPrice,
             profit,
@@ -172,6 +185,8 @@ export const useInventoryStore = create<InventoryStoreState>()(
               [input.size]: {
                 ...state.items[input.size],
                 quantity: state.items[input.size].quantity - quantity,
+                bundles:
+                  Math.round(toNonNegativeNumber(state.items[input.size].bundles ?? 0)) - bundles,
                 sellingPrice: unitSellingPrice,
               },
             },

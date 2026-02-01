@@ -52,6 +52,7 @@ function isInventoryItem(value: unknown): value is InventoryItem {
   if (!isRecord(value)) return false
   return (
     typeof value.quantity === 'number' &&
+    (!('bundles' in value) || typeof value.bundles === 'number') &&
     typeof value.averageCostPrice === 'number' &&
     typeof value.sellingPrice === 'number' &&
     typeof value.lowStockThreshold === 'number'
@@ -79,6 +80,7 @@ function isTransaction(value: unknown): value is InventoryTransaction {
     (value.type === 'ADD' || value.type === 'SALE') &&
     isRodSize(value.size) &&
     typeof value.quantity === 'number' &&
+    (!('bundles' in value) || typeof value.bundles === 'number' || value.bundles === null) &&
     (typeof value.unitCost === 'number' || value.unitCost === null) &&
     (typeof value.unitPrice === 'number' || value.unitPrice === null) &&
     typeof value.profit === 'number' &&

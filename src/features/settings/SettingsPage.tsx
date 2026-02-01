@@ -54,7 +54,9 @@ export function SettingsPage() {
       <Card>
         <div className="mb-3">
           <div className="text-sm font-semibold">Low Stock Thresholds</div>
-          <div className="text-sm text-slate-500">Used for the “Low stock” status badge</div>
+          <div className="text-sm text-slate-500">
+            Rods use bundles; cement uses quantity.
+          </div>
         </div>
 
         <div className="grid gap-3 md:grid-cols-3">
@@ -332,7 +334,7 @@ function ThresholdField({
 }) {
   return (
     <div className="rounded-lg bg-slate-50 p-3">
-      <div className="text-sm font-medium text-slate-700">{size}</div>
+      <div className="text-sm font-medium text-slate-700">{size} (bundles)</div>
       <div className="mt-2">
         <Input
           type="number"

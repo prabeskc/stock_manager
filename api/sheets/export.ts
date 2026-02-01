@@ -62,7 +62,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         : {}
 
     const inventoryRows: (string | number)[][] = [
-      ['Iron Rod', 'quantity', 'averageCostPrice', 'sellingPrice', 'lowStockThreshold'],
+      ['Iron Rod', 'quantity', 'averageCostPrice', 'sellingPrice', 'lowStockThreshold', 'bundles'],
       ...ROD_SIZES.map((size) => {
         const maybeItem = itemsRecord[size]
         const item =
@@ -75,10 +75,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           toNumber(item.averageCostPrice),
           toNumber(item.sellingPrice),
           Math.round(toNumber(item.lowStockThreshold)),
+          Math.round(toNumber(item.bundles)),
         ]
       }),
-      ['', '', '', '', ''],
-      ['Cement', 'quantity', 'averageCostPrice', 'sellingPrice', 'lowStockThreshold'],
+      ['', '', '', '', '', ''],
+      ['Cement', 'quantity', 'averageCostPrice', 'sellingPrice', 'lowStockThreshold', 'bundles'],
       ...CEMENT_PRODUCTS.map((product) => {
         const maybeItem = cementItemsRecord[product]
         const item =
@@ -91,13 +92,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           toNumber(item.averageCostPrice),
           toNumber(item.sellingPrice),
           Math.round(toNumber(item.lowStockThreshold)),
+          0,
         ]
       }),
     ]
 
     const txs = Array.isArray(body.transactions) ? body.transactions : []
     const txRows: (string | number | null)[][] = [
-      ['id', 'type', 'size', 'quantity', 'unitCost', 'unitPrice', 'profit', 'createdAt'],
+      ['id', 'type', 'size', 'quantity', 'bundles', 'unitCost', 'unitPrice', 'profit', 'createdAt'],
       ...txs.map((t) => {
         const tx = t && typeof t === 'object' ? (t as Record<string, unknown>) : {}
         const unitCost = tx.unitCost
@@ -108,6 +110,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           toString(tx.type),
           toString(tx.size),
           toNumber(tx.quantity),
+          tx.bundles == null ? null : Math.round(toNumber(tx.bundles)),
           unitCost == null ? null : toNumber(unitCost),
           unitPrice == null ? null : toNumber(unitPrice),
           toNumber(tx.profit),

@@ -8,6 +8,7 @@ export type CementProduct = (typeof CEMENT_PRODUCTS)[number]
 
 export type InventoryItem = {
   quantity: number
+  bundles?: number
   averageCostPrice: number
   sellingPrice: number
   lowStockThreshold: number
@@ -20,6 +21,7 @@ export type InventoryTransaction = {
   type: InventoryTransactionType
   size: RodSize
   quantity: number
+  bundles?: number | null
   unitCost: number | null
   unitPrice: number | null
   profit: number

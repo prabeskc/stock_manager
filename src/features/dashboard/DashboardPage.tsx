@@ -40,7 +40,9 @@ export function DashboardPage() {
       0,
     )
     const lowStockCount = sizes.reduce(
-      (sum, size) => sum + (items[size].quantity < items[size].lowStockThreshold ? 1 : 0),
+      (sum, size) =>
+        sum +
+        (Math.round(items[size].bundles ?? 0) < items[size].lowStockThreshold ? 1 : 0),
       0,
     )
     const realizedProfit = transactions
@@ -129,6 +131,7 @@ export function DashboardPage() {
                 <tr className="border-b border-slate-100">
                   <th className="py-3 pr-4 font-medium">Size</th>
                   <th className="py-3 pr-4 font-medium">Qty</th>
+                  <th className="py-3 pr-4 font-medium">Bundles</th>
                   <th className="py-3 pr-4 font-medium">CP (avg)</th>
                   <th className="py-3 pr-4 font-medium">SP</th>
                   <th className="py-3 pr-4 font-medium">Margin</th>
@@ -140,7 +143,7 @@ export function DashboardPage() {
                 {ROD_SIZES.map((size) => {
                   const item = items[size]
                   const margin = item.sellingPrice - item.averageCostPrice
-                  const isLow = item.quantity < item.lowStockThreshold
+                  const isLow = Math.round(item.bundles ?? 0) < item.lowStockThreshold
 
                   return (
                     <tr key={size} className="border-b border-slate-50">
@@ -150,6 +153,7 @@ export function DashboardPage() {
                         </div>
                       </td>
                       <td className="py-4 pr-4 font-medium">{formatNumber(item.quantity)}</td>
+                      <td className="py-4 pr-4 font-medium">{formatNumber(item.bundles ?? 0)}</td>
                       <td className="py-4 pr-4">
                         <InlineMoneyField
                           key={`${size}-cp-${item.averageCostPrice}`}
@@ -376,7 +380,7 @@ function InventoryMobileCard({
   const setSellingPrice = useInventoryStore((s) => s.setSellingPrice)
 
   const margin = item.sellingPrice - item.averageCostPrice
-  const isLow = item.quantity < item.lowStockThreshold
+  const isLow = Math.round(item.bundles ?? 0) < item.lowStockThreshold
 
   return (
     <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
@@ -400,6 +404,7 @@ function InventoryMobileCard({
           <div>
             <div className="text-sm text-slate-500">Qty</div>
             <div className="mt-1 text-lg font-semibold">{formatNumber(item.quantity)}</div>
+            <div className="mt-1 text-sm text-slate-500">Bundles: {formatNumber(item.bundles ?? 0)}</div>
           </div>
           <div>
             <div className="text-sm text-slate-500">Margin</div>
@@ -531,15 +536,17 @@ function AddStockDialog({
 }: {
   size: RodSize
   onClose: () => void
-  onSubmit: (input: { size: RodSize; quantity: number; unitCostPrice: number }) => void
+  onSubmit: (input: { size: RodSize; quantity: number; bundles?: number; unitCostPrice: number }) => void
 }) {
   const [quantity, setQuantity] = useState('')
+  const [bundles, setBundles] = useState('')
   const [unitCostPrice, setUnitCostPrice] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const close = () => {
     setError(null)
     setQuantity('')
+    setBundles('')
     setUnitCostPrice('')
     onClose()
   }
@@ -559,17 +566,26 @@ function AddStockDialog({
             type="button"
             onClick={() => {
               const qty = Number(quantity)
+              const bdls = Number(bundles)
               const cp = Number(unitCostPrice)
-              if (!Number.isFinite(qty) || qty <= 0) {
+              if (!Number.isFinite(qty) || qty < 0) {
                 setError('Enter a valid quantity.')
                 return
               }
-              if (!Number.isFinite(cp) || cp < 0) {
+              if (!Number.isFinite(bdls) || bdls < 0) {
+                setError('Enter a valid bundles value.')
+                return
+              }
+              if (qty <= 0 && bdls <= 0) {
+                setError('Enter quantity or bundles.')
+                return
+              }
+              if (qty > 0 && (!Number.isFinite(cp) || cp < 0)) {
                 setError('Enter a valid cost price.')
                 return
               }
               setError(null)
-              onSubmit({ size, quantity: qty, unitCostPrice: cp })
+              onSubmit({ size, quantity: qty, bundles: bdls, unitCostPrice: qty > 0 ? cp : 0 })
               close()
             }}
           >
@@ -580,7 +596,7 @@ function AddStockDialog({
     >
       <div className="space-y-3">
         <div className="grid gap-2">
-          <div className="text-sm font-medium text-slate-700">Quantity</div>
+          <div className="text-sm font-medium text-slate-700">Quantity (pcs)</div>
           <Input
             inputMode="numeric"
             type="number"
@@ -589,6 +605,18 @@ function AddStockDialog({
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
             placeholder="e.g. 50"
+          />
+        </div>
+        <div className="grid gap-2">
+          <div className="text-sm font-medium text-slate-700">Bundles</div>
+          <Input
+            inputMode="numeric"
+            type="number"
+            min="0"
+            step="1"
+            value={bundles}
+            onChange={(e) => setBundles(e.target.value)}
+            placeholder="e.g. 5"
           />
         </div>
         <div className="grid gap-2">
@@ -625,16 +653,19 @@ function DeductStockDialog({
   onSubmit: (input: {
     size: RodSize
     quantity: number
+    bundles?: number
     unitSellingPrice?: number
   }) => void
 }) {
   const [quantity, setQuantity] = useState('')
+  const [bundles, setBundles] = useState('')
   const [unitSellingPrice, setUnitSellingPrice] = useState(String(currentSellingPrice || 0))
   const [error, setError] = useState<string | null>(null)
 
   const close = () => {
     setError(null)
     setQuantity('')
+    setBundles('')
     setUnitSellingPrice(String(currentSellingPrice || 0))
     onClose()
   }
@@ -654,18 +685,27 @@ function DeductStockDialog({
             type="button"
             onClick={() => {
               const qty = Number(quantity)
+              const bdls = Number(bundles)
               const sp = Number(unitSellingPrice)
-              if (!Number.isFinite(qty) || qty <= 0) {
+              if (!Number.isFinite(qty) || qty < 0) {
                 setError('Enter a valid quantity.')
                 return
               }
-              if (!Number.isFinite(sp) || sp < 0) {
+              if (!Number.isFinite(bdls) || bdls < 0) {
+                setError('Enter a valid bundles value.')
+                return
+              }
+              if (qty <= 0 && bdls <= 0) {
+                setError('Enter quantity or bundles.')
+                return
+              }
+              if (qty > 0 && (!Number.isFinite(sp) || sp < 0)) {
                 setError('Enter a valid selling price.')
                 return
               }
               setError(null)
               try {
-                onSubmit({ size, quantity: qty, unitSellingPrice: sp })
+                onSubmit({ size, quantity: qty, bundles: bdls, unitSellingPrice: qty > 0 ? sp : 0 })
               } catch (e) {
                 setError(e instanceof Error ? e.message : 'Unable to deduct stock.')
                 return
@@ -680,7 +720,7 @@ function DeductStockDialog({
     >
       <div className="space-y-3">
         <div className="grid gap-2">
-          <div className="text-sm font-medium text-slate-700">Quantity</div>
+          <div className="text-sm font-medium text-slate-700">Quantity (pcs)</div>
           <Input
             inputMode="numeric"
             type="number"
@@ -689,6 +729,18 @@ function DeductStockDialog({
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
             placeholder="e.g. 10"
+          />
+        </div>
+        <div className="grid gap-2">
+          <div className="text-sm font-medium text-slate-700">Bundles</div>
+          <Input
+            inputMode="numeric"
+            type="number"
+            min="0"
+            step="1"
+            value={bundles}
+            onChange={(e) => setBundles(e.target.value)}
+            placeholder="e.g. 1"
           />
         </div>
         <div className="grid gap-2">

@@ -67,6 +67,13 @@ export function TransactionsPage() {
             </div>
 
             <div className="mt-3">
+              <div className="text-sm text-slate-500">Bundles</div>
+              <div className="mt-1 text-base font-semibold">
+                {kind === 'rod' ? formatNumber(t.bundles ?? 0) : '—'}
+              </div>
+            </div>
+
+            <div className="mt-3">
               <div className="text-sm text-slate-500">Profit</div>
               <div className="mt-1 text-base font-semibold">
                 {t.type === 'SALE' ? formatMoney(t.profit) : '—'}
@@ -84,6 +91,7 @@ export function TransactionsPage() {
               <th className="py-3 pr-4 font-medium">Type</th>
               <th className="py-3 pr-4 font-medium">Item</th>
               <th className="py-3 pr-4 font-medium">Qty</th>
+              <th className="py-3 pr-4 font-medium">Bundles</th>
               <th className="py-3 pr-4 font-medium">Unit Cost</th>
               <th className="py-3 pr-4 font-medium">Unit Price</th>
               <th className="py-3 pr-4 font-medium">Profit</th>
@@ -109,6 +117,7 @@ export function TransactionsPage() {
                 </td>
                 <td className="py-4 pr-4">{kind === 'rod' ? t.size : t.product}</td>
                 <td className="py-4 pr-4">{formatNumber(t.quantity)}</td>
+                <td className="py-4 pr-4">{kind === 'rod' ? formatNumber(t.bundles ?? 0) : '—'}</td>
                 <td className="py-4 pr-4">{t.unitCost == null ? '—' : formatMoney(t.unitCost)}</td>
                 <td className="py-4 pr-4">
                   {t.unitPrice == null ? '—' : formatMoney(t.unitPrice)}

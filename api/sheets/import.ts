@@ -40,11 +40,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       sheetTitles: ['Items', 'Transactions', 'CementTransactions', 'Meta'],
     })
 
-    const itemsAll = await readValues({ sheets, spreadsheetId, range: 'Items!A1:E50' })
+    const itemsAll = await readValues({ sheets, spreadsheetId, range: 'Items!A1:F50' })
     const transactionsValues = await readValues({
       sheets,
       spreadsheetId,
-      range: 'Transactions!A2:H',
+      range: 'Transactions!A2:I',
     })
     const cementTransactionsValues = await readValues({
       sheets,
@@ -58,13 +58,20 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       string,
       {
         quantity: number
+        bundles: number
         averageCostPrice: number
         sellingPrice: number
         lowStockThreshold: number
       }
     > = {}
     for (const size of ROD_SIZES) {
-      items[size] = { quantity: 0, averageCostPrice: 0, sellingPrice: 0, lowStockThreshold: 10 }
+      items[size] = {
+        quantity: 0,
+        bundles: 0,
+        averageCostPrice: 0,
+        sellingPrice: 0,
+        lowStockThreshold: 10,
+      }
     }
 
     const firstRow = itemsAll[0] ?? []
@@ -78,9 +85,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         if (firstCell === 'Cement') break
         if (!firstCell) continue
         if (!ROD_SIZES.includes(firstCell as (typeof ROD_SIZES)[number])) continue
-        const [, quantity, averageCostPrice, sellingPrice, lowStockThreshold] = row
+        const [, quantity, averageCostPrice, sellingPrice, lowStockThreshold, bundles] = row
         items[firstCell] = {
           quantity: Math.round(toNumber(quantity)),
+          bundles: Math.round(toNumber(bundles)),
           averageCostPrice: toNumber(averageCostPrice),
           sellingPrice: toNumber(sellingPrice),
           lowStockThreshold: Math.round(toNumber(lowStockThreshold)),
@@ -89,11 +97,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     } else {
       const itemsValues = itemsAll.slice(1)
       for (const row of itemsValues) {
-        const [size, quantity, averageCostPrice, sellingPrice, lowStockThreshold] = row
+        const [size, quantity, averageCostPrice, sellingPrice, lowStockThreshold, bundles] = row
         const key = toString(size)
         if (!ROD_SIZES.includes(key as (typeof ROD_SIZES)[number])) continue
         items[key] = {
           quantity: Math.round(toNumber(quantity)),
+          bundles: Math.round(toNumber(bundles)),
           averageCostPrice: toNumber(averageCostPrice),
           sellingPrice: toNumber(sellingPrice),
           lowStockThreshold: Math.round(toNumber(lowStockThreshold)),
@@ -104,12 +113,17 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const transactions = transactionsValues
       .filter((row) => row.length > 0 && row.some((v) => v !== '' && v != null))
       .map((row) => {
-        const [id, type, size, quantity, unitCost, unitPrice, profit, createdAt] = row
+        const hasBundlesColumn = row.length >= 9
+        const [id, type, size, quantity, bundles, unitCost, unitPrice, profit, createdAt] =
+          hasBundlesColumn
+            ? row
+            : [row[0], row[1], row[2], row[3], null, row[4], row[5], row[6], row[7]]
         return {
           id: toString(id),
           type: toString(type),
           size: toString(size),
           quantity: Math.round(toNumber(quantity)),
+          bundles: bundles == null || bundles === '' ? null : Math.round(toNumber(bundles)),
           unitCost: unitCost === '' || unitCost == null ? null : toNumber(unitCost),
           unitPrice: unitPrice === '' || unitPrice == null ? null : toNumber(unitPrice),
           profit: toNumber(profit),
@@ -119,7 +133,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     const cementItems: Record<
       string,
-      { quantity: number; averageCostPrice: number; sellingPrice: number; lowStockThreshold: number }
+      {
+        quantity: number
+        averageCostPrice: number
+        sellingPrice: number
+        lowStockThreshold: number
+      }
     > = {}
     for (const product of CEMENT_PRODUCTS) {
       cementItems[product] = {
